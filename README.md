@@ -1,4 +1,4 @@
-# Triagely
+# Patient Intake And Triage
 
 AI patient intake and triage for clinics. A patient chats about their symptoms before the visit. The AI asks follow-up questions, writes a short summary and suggests how urgent the case is. Clinic staff get a live queue, sorted so the sickest patients are seen first.
 
