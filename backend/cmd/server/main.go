@@ -27,6 +27,10 @@ func main() {
 	}
 	defer pool.Close()
 
+	if err := db.Migrate(ctx, pool); err != nil {
+		log.Fatalf("migrate: %v", err)
+	}
+
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           httpapi.NewRouter(pool),

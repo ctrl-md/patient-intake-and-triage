@@ -34,13 +34,13 @@ These are the most important part of the project.
 
 ## Stack
 
-| Part | Tech |
-|---|---|
-| Backend | Go, chi, pgx, Postgres, JWT auth |
-| AI | Gemini or Groq (free tier), called directly from Go |
-| Frontend | Next.js (App Router), TypeScript, Tailwind CSS |
-| Live updates | Server-Sent Events (or WebSocket) |
-| Local setup | Docker Compose |
+| Part         | Tech                                                |
+| ------------ | --------------------------------------------------- |
+| Backend      | Go, chi, pgx, Postgres, JWT auth                    |
+| AI           | Gemini or Groq (free tier), called directly from Go |
+| Frontend     | Next.js (App Router), TypeScript, Tailwind CSS      |
+| Live updates | Server-Sent Events (or WebSocket)                   |
+| Local setup  | Docker Compose                                      |
 
 One Go service. No Kafka, no microservices. Keep it simple.
 
@@ -117,16 +117,16 @@ PORT=8080
 
 ## API overview
 
-| Method | Route | What it does |
-|---|---|---|
-| POST | `/auth/register` | Create a staff account |
-| POST | `/auth/login` | Log in, get a JWT |
-| POST | `/intakes` | Staff creates an intake link |
-| POST | `/intakes/:token/messages` | Patient sends a message, gets the next question |
-| GET | `/queue` | Live queue for staff (sorted by urgency) |
-| GET | `/cases/:id` | Case detail, chat and summary |
-| PATCH | `/cases/:id/urgency` | Staff override (reason required) |
-| GET | `/health` | Health check |
+| Method | Route                      | What it does                                    |
+| ------ | -------------------------- | ----------------------------------------------- |
+| POST   | `/auth/register`           | Create a staff account                          |
+| POST   | `/auth/login`              | Log in, get a JWT                               |
+| POST   | `/intakes`                 | Staff creates an intake link                    |
+| POST   | `/intakes/:token/messages` | Patient sends a message, gets the next question |
+| GET    | `/queue`                   | Live queue for staff (sorted by urgency)        |
+| GET    | `/cases/:id`               | Case detail, chat and summary                   |
+| PATCH  | `/cases/:id/urgency`       | Staff override (reason required)                |
+| GET    | `/health`                  | Health check                                    |
 
 ## Testing and evals
 
