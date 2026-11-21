@@ -10,13 +10,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/your-username/triagely/backend/internal/config"
-	"github.com/your-username/triagely/backend/internal/db"
-	"github.com/your-username/triagely/backend/internal/httpapi"
+	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/auth"
+	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/config"
+	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/db"
+	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/httpapi"
 )
 
 func main() {
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -31,9 +35,15 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
+	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTTTL)
+	authHandler, err := auth.NewHandler(auth.NewPGStore(pool), auth.BcryptHasher{}, tokens)
+	if err != nil {
+		log.Fatalf("auth: %v", err)
+	}
+
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(pool),
+		Handler:           httpapi.NewRouter(httpapi.Deps{DB: pool, Auth: authHandler, Tokens: tokens}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

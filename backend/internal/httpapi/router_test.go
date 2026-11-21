@@ -26,7 +26,7 @@ func TestHealth(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/health", nil)
 			rec := httptest.NewRecorder()
-			NewRouter(tc.db).ServeHTTP(rec, req)
+			NewRouter(Deps{DB: tc.db}).ServeHTTP(rec, req)
 			if rec.Code != tc.want {
 				t.Fatalf("got %d, want %d", rec.Code, tc.want)
 			}
