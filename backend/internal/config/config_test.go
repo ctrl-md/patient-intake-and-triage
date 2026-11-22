@@ -28,6 +28,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Port != "8080" || cfg.JWTTTL != 12*time.Hour {
 		t.Fatalf("bad defaults: %+v", cfg)
 	}
+	if cfg.FrontendURL != "http://localhost:3000" || cfg.IntakeTTL != 24*time.Hour {
+		t.Fatalf("bad intake defaults: %+v", cfg)
+	}
 }
 
 func TestLoadBadTTL(t *testing.T) {
@@ -35,6 +38,28 @@ func TestLoadBadTTL(t *testing.T) {
 	t.Setenv("JWT_TTL", "soon")
 	if _, err := Load(); err == nil {
 		t.Fatal("expected an error for a bad JWT_TTL")
+	}
+}
+
+func TestLoadIntakeSettings(t *testing.T) {
+	t.Setenv("JWT_SECRET", goodSecret)
+	t.Setenv("FRONTEND_URL", "https://triagely.example.com/")
+	t.Setenv("INTAKE_TTL", "90m")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.FrontendURL != "https://triagely.example.com" {
+		t.Errorf("trailing slash should be removed, got %q", cfg.FrontendURL)
+	}
+	if cfg.IntakeTTL != 90*time.Minute {
+		t.Errorf("IntakeTTL = %v", cfg.IntakeTTL)
+	}
+
+	t.Setenv("INTAKE_TTL", "tomorrow")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected an error for a bad INTAKE_TTL")
 	}
 }
 

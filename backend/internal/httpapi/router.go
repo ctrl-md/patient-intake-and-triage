@@ -7,6 +7,7 @@ import (
 
 	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/auth"
 	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/httpx"
+	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/intake"
 )
 
 // Pinger is anything that can check if the database is alive.
@@ -21,6 +22,7 @@ type Deps struct {
 	DB     Pinger
 	Auth   *auth.Handler
 	Tokens *auth.TokenManager
+	Intake *intake.Handler
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -33,6 +35,10 @@ func NewRouter(d Deps) http.Handler {
 		mux.HandleFunc("POST /auth/register", d.Auth.Register)
 		mux.HandleFunc("POST /auth/login", d.Auth.Login)
 		mux.Handle("GET /auth/me", requireLogin(http.HandlerFunc(d.Auth.Me)))
+	}
+
+	if d.Intake != nil && d.Tokens != nil {
+		intake.Routes(mux, d.Intake, auth.Middleware(d.Tokens))
 	}
 	return mux
 }

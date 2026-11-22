@@ -14,6 +14,7 @@ import (
 	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/config"
 	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/db"
 	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/httpapi"
+	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/intake"
 )
 
 func main() {
@@ -41,9 +42,11 @@ func main() {
 		log.Fatalf("auth: %v", err)
 	}
 
+	intakeHandler := intake.NewHandler(intake.NewPGStore(pool), cfg.FrontendURL, cfg.IntakeTTL)
+
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(httpapi.Deps{DB: pool, Auth: authHandler, Tokens: tokens}),
+		Handler:           httpapi.NewRouter(httpapi.Deps{DB: pool, Auth: authHandler, Tokens: tokens, Intake: intakeHandler}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

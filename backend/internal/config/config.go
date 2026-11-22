@@ -14,6 +14,9 @@ type Config struct {
 	DatabaseURL string
 	JWTSecret   string
 	JWTTTL      time.Duration
+
+	FrontendURL string        // where the patient chat page lives (used to build intake links)
+	IntakeTTL   time.Duration // how long an intake link works
 }
 
 // Load reads settings from the environment. If a .env file exists in the
@@ -28,11 +31,18 @@ func Load() (Config, error) {
 		return Config{}, errors.New("JWT_TTL must be a duration like 12h or 30m")
 	}
 
+	intakeTTL, err := time.ParseDuration(getenv("INTAKE_TTL", "24h"))
+	if err != nil || intakeTTL <= 0 {
+		return Config{}, errors.New("INTAKE_TTL must be a duration like 24h or 90m")
+	}
+
 	cfg := Config{
 		Port:        getenv("PORT", "8080"),
 		DatabaseURL: getenv("DATABASE_URL", "postgres://triagely:triagely@localhost:5432/triagely?sslmode=disable"),
 		JWTSecret:   os.Getenv("JWT_SECRET"),
 		JWTTTL:      ttl,
+		FrontendURL: strings.TrimRight(getenv("FRONTEND_URL", "http://localhost:3000"), "/"),
+		IntakeTTL:   intakeTTL,
 	}
 	if len(cfg.JWTSecret) < 32 {
 		return Config{}, errors.New("JWT_SECRET must be at least 32 characters (make one with: openssl rand -hex 32)")
