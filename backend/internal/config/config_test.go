@@ -63,6 +63,32 @@ func TestLoadIntakeSettings(t *testing.T) {
 	}
 }
 
+func TestLoadCORSOrigins(t *testing.T) {
+	t.Setenv("JWT_SECRET", goodSecret)
+	t.Setenv("FRONTEND_URL", "http://localhost:3000")
+
+	// Default is the frontend URL.
+	t.Setenv("CORS_ORIGINS", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.CORSOrigins) != 1 || cfg.CORSOrigins[0] != "http://localhost:3000" {
+		t.Fatalf("default origins = %v", cfg.CORSOrigins)
+	}
+
+	// A list, with spaces, empty parts and trailing slashes.
+	t.Setenv("CORS_ORIGINS", "http://localhost:3000, https://app.example.com/ ,,")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"http://localhost:3000", "https://app.example.com"}
+	if len(cfg.CORSOrigins) != 2 || cfg.CORSOrigins[0] != want[0] || cfg.CORSOrigins[1] != want[1] {
+		t.Fatalf("origins = %v, want %v", cfg.CORSOrigins, want)
+	}
+}
+
 func TestLoadDotEnv(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".env")
 	content := "\ufeff# comment\n" +

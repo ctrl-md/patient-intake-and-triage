@@ -17,6 +17,9 @@ type Config struct {
 
 	FrontendURL string        // where the patient chat page lives (used to build intake links)
 	IntakeTTL   time.Duration // how long an intake link works
+
+	// Browser origins allowed to call the API (CORS). Defaults to FrontendURL.
+	CORSOrigins []string
 }
 
 // Load reads settings from the environment. If a .env file exists in the
@@ -44,10 +47,28 @@ func Load() (Config, error) {
 		FrontendURL: strings.TrimRight(getenv("FRONTEND_URL", "http://localhost:3000"), "/"),
 		IntakeTTL:   intakeTTL,
 	}
+	cfg.CORSOrigins = splitList(os.Getenv("CORS_ORIGINS"))
+	if len(cfg.CORSOrigins) == 0 {
+		cfg.CORSOrigins = []string{cfg.FrontendURL}
+	}
+
 	if len(cfg.JWTSecret) < 32 {
 		return Config{}, errors.New("JWT_SECRET must be at least 32 characters (make one with: openssl rand -hex 32)")
 	}
 	return cfg, nil
+}
+
+// splitList turns "a, b/ ,,c" into ["a" "b" "c"]. Trailing slashes are removed,
+// because a browser origin never has one.
+func splitList(raw string) []string {
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimRight(strings.TrimSpace(part), "/")
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 func getenv(key, fallback string) string {

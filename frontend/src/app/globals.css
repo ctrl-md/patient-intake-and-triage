@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* System fonts: nothing to download, fast on slow connections. */
+@theme inline {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--font-sans);
+}

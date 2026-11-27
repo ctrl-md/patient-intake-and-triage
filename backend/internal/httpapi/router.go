@@ -23,6 +23,9 @@ type Deps struct {
 	Auth   *auth.Handler
 	Tokens *auth.TokenManager
 	Intake *intake.Handler
+
+	// Browser origins allowed to call the API, like http://localhost:3000
+	CORSOrigins []string
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -40,7 +43,7 @@ func NewRouter(d Deps) http.Handler {
 	if d.Intake != nil && d.Tokens != nil {
 		intake.Routes(mux, d.Intake, auth.Middleware(d.Tokens))
 	}
-	return mux
+	return CORS(d.CORSOrigins)(mux)
 }
 
 func healthHandler(db Pinger) http.HandlerFunc {

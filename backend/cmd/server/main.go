@@ -46,7 +46,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(httpapi.Deps{DB: pool, Auth: authHandler, Tokens: tokens, Intake: intakeHandler}),
+		Handler:           httpapi.NewRouter(httpapi.Deps{DB: pool, Auth: authHandler, Tokens: tokens, Intake: intakeHandler, CORSOrigins: cfg.CORSOrigins}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
