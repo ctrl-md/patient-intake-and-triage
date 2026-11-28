@@ -32,6 +32,7 @@ type Intake struct {
 	CompletedAt  *time.Time
 	CreatedAt    time.Time
 	MessageCount int
+	Urgency      *string // from triage: staff choice if any, else the system's. nil before triage.
 }
 
 type NewPatient struct {

@@ -20,6 +20,13 @@ type Config struct {
 
 	// Browser origins allowed to call the API (CORS). Defaults to FrontendURL.
 	CORSOrigins []string
+
+	// AI. Leave LLMAPIKey empty to run without AI: the rules engine and fixed
+	// follow-up questions still work.
+	LLMProvider string // gemini or groq
+	LLMAPIKey   string
+	LLMModel    string // empty = a default for the provider
+	LLMTimeout  time.Duration
 }
 
 // Load reads settings from the environment. If a .env file exists in the
@@ -39,6 +46,11 @@ func Load() (Config, error) {
 		return Config{}, errors.New("INTAKE_TTL must be a duration like 24h or 90m")
 	}
 
+	llmTimeout, err := time.ParseDuration(getenv("LLM_TIMEOUT", "20s"))
+	if err != nil || llmTimeout <= 0 {
+		return Config{}, errors.New("LLM_TIMEOUT must be a duration like 20s")
+	}
+
 	cfg := Config{
 		Port:        getenv("PORT", "8080"),
 		DatabaseURL: getenv("DATABASE_URL", "postgres://triagely:triagely@localhost:5432/triagely?sslmode=disable"),
@@ -46,6 +58,10 @@ func Load() (Config, error) {
 		JWTTTL:      ttl,
 		FrontendURL: strings.TrimRight(getenv("FRONTEND_URL", "http://localhost:3000"), "/"),
 		IntakeTTL:   intakeTTL,
+		LLMProvider: strings.ToLower(getenv("LLM_PROVIDER", "gemini")),
+		LLMAPIKey:   strings.TrimSpace(os.Getenv("LLM_API_KEY")),
+		LLMModel:    strings.TrimSpace(os.Getenv("LLM_MODEL")),
+		LLMTimeout:  llmTimeout,
 	}
 	cfg.CORSOrigins = splitList(os.Getenv("CORS_ORIGINS"))
 	if len(cfg.CORSOrigins) == 0 {
@@ -54,6 +70,9 @@ func Load() (Config, error) {
 
 	if len(cfg.JWTSecret) < 32 {
 		return Config{}, errors.New("JWT_SECRET must be at least 32 characters (make one with: openssl rand -hex 32)")
+	}
+	if cfg.LLMAPIKey != "" && cfg.LLMProvider != "gemini" && cfg.LLMProvider != "groq" {
+		return Config{}, errors.New("LLM_PROVIDER must be gemini or groq")
 	}
 	return cfg, nil
 }

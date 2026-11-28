@@ -1,6 +1,7 @@
 package intake
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,27 @@ type Handler struct {
 	ttl         time.Duration
 	maxMessages int
 	now         func() time.Time
+	hooks       Hooks
+	background  func(func()) // runs triage after "complete". Tests run it inline.
+}
+
+// Hooks plug the AI side into the intake chat. All parts are optional.
+// Without them the chat just saves messages.
+type Hooks struct {
+	// Emergency says whether the patient's messages hit an emergency rule.
+	// It runs BEFORE any AI call. If true, the AI is skipped.
+	Emergency      func(patientTexts []string) bool
+	EmergencyReply string
+	// Reply returns the assistant's next message. It must not fail.
+	Reply func(ctx context.Context, history []Message) string
+	// Triage runs after the patient finishes. It runs in the background.
+	Triage func(ctx context.Context, intakeID string, history []Message)
+}
+
+// WithHooks turns on the AI parts.
+func (h *Handler) WithHooks(hooks Hooks) *Handler {
+	h.hooks = hooks
+	return h
 }
 
 // NewHandler makes the intake handler. frontendURL is where the patient chat
@@ -38,6 +60,7 @@ func NewHandler(store Store, frontendURL string, ttl time.Duration) *Handler {
 		ttl:         ttl,
 		maxMessages: defaultMaxMsgs,
 		now:         time.Now,
+		background:  func(f func()) { go f() },
 	}
 }
 
@@ -67,6 +90,7 @@ type intakeView struct {
 	CompletedAt  *time.Time `json:"completed_at"`
 	CreatedAt    time.Time  `json:"created_at"`
 	MessageCount int        `json:"message_count"`
+	Urgency      *string    `json:"urgency"`
 }
 
 type messageView struct {
@@ -81,7 +105,7 @@ func (h *Handler) view(i Intake) intakeView {
 		ID: i.ID, PatientID: i.PatientID, PatientName: i.PatientName,
 		Status: effectiveStatus(i, h.now()), ExpiresAt: i.ExpiresAt,
 		StartedAt: i.StartedAt, CompletedAt: i.CompletedAt,
-		CreatedAt: i.CreatedAt, MessageCount: i.MessageCount,
+		CreatedAt: i.CreatedAt, MessageCount: i.MessageCount, Urgency: i.Urgency,
 	}
 }
 
@@ -271,7 +295,7 @@ type sendRequest struct {
 	Content string `json:"content"`
 }
 
-// PublicSend saves a message from the patient. (The AI reply is added on Day 8.)
+// PublicSend saves a message from the patient, then adds the assistant's reply.
 func (h *Handler) PublicSend(w http.ResponseWriter, r *http.Request) {
 	in, ok := h.loadByToken(w, r)
 	if !ok {
@@ -315,9 +339,63 @@ func (h *Handler) PublicSend(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	httpx.WriteJSON(w, http.StatusCreated, map[string]messageView{
-		"message": {ID: msg.ID, Role: msg.Role, Content: msg.Content, CreatedAt: msg.CreatedAt},
-	})
+	resp := map[string]any{
+		"message": messageView{ID: msg.ID, Role: msg.Role, Content: msg.Content, CreatedAt: msg.CreatedAt},
+	}
+	if reply, emergency := h.assistantReply(r.Context(), in.ID); reply != nil {
+		resp["reply"] = reply
+		resp["emergency"] = emergency
+	}
+	httpx.WriteJSON(w, http.StatusCreated, resp)
+}
+
+// assistantReply decides what the assistant says next and saves it.
+// Order matters: the emergency rules are checked first, and if they fire the AI is not called.
+// It returns nil when there is no assistant or the reply could not be saved.
+func (h *Handler) assistantReply(ctx context.Context, intakeID string) (*messageView, bool) {
+	if h.hooks.Reply == nil && h.hooks.Emergency == nil {
+		return nil, false
+	}
+	history, err := h.store.Messages(ctx, intakeID)
+	if err != nil {
+		log.Printf("intake: messages for reply: %v", err)
+		return nil, false
+	}
+
+	emergency := false
+	var text string
+	if h.hooks.Emergency != nil && h.hooks.Emergency(patientTexts(history)) {
+		emergency = true
+		text = h.hooks.EmergencyReply
+	} else if h.hooks.Reply != nil {
+		text = h.hooks.Reply(ctx, history)
+	}
+	if strings.TrimSpace(text) == "" {
+		return nil, emergency
+	}
+
+	saved, err := h.store.AddMessage(ctx, intakeID, RoleAssistant, text, h.maxMessages)
+	if err != nil {
+		if !errors.Is(err, ErrTooManyMessages) {
+			log.Printf("intake: save reply: %v", err)
+		}
+		// Still show an emergency warning even if we could not save it.
+		if emergency {
+			return &messageView{Role: RoleAssistant, Content: text, CreatedAt: h.now()}, true
+		}
+		return nil, false
+	}
+	return &messageView{ID: saved.ID, Role: saved.Role, Content: saved.Content, CreatedAt: saved.CreatedAt}, emergency
+}
+
+func patientTexts(msgs []Message) []string {
+	var out []string
+	for _, m := range msgs {
+		if m.Role == RolePatient {
+			out = append(out, m.Content)
+		}
+	}
+	return out
 }
 
 // PublicComplete is the patient saying "I'm done". Safe to call twice.
@@ -339,6 +417,21 @@ func (h *Handler) PublicComplete(w http.ResponseWriter, r *http.Request) {
 		log.Printf("intake: complete: %v", err)
 		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
 		return
+	}
+
+	// Triage runs on its own so the patient does not wait for the AI.
+	if h.hooks.Triage != nil {
+		id := in.ID
+		h.background(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			msgs, err := h.store.Messages(ctx, id)
+			if err != nil {
+				log.Printf("intake: load messages for triage: %v", err)
+				return
+			}
+			h.hooks.Triage(ctx, id, msgs)
+		})
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": StatusCompleted})
 }

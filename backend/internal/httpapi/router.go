@@ -8,6 +8,7 @@ import (
 	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/auth"
 	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/httpx"
 	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/intake"
+	"github.com/ctrl-md/patient-intake-and-triage/backend/internal/triage"
 )
 
 // Pinger is anything that can check if the database is alive.
@@ -23,6 +24,7 @@ type Deps struct {
 	Auth   *auth.Handler
 	Tokens *auth.TokenManager
 	Intake *intake.Handler
+	Triage *triage.Handler
 
 	// Browser origins allowed to call the API, like http://localhost:3000
 	CORSOrigins []string
@@ -42,6 +44,9 @@ func NewRouter(d Deps) http.Handler {
 
 	if d.Intake != nil && d.Tokens != nil {
 		intake.Routes(mux, d.Intake, auth.Middleware(d.Tokens))
+		if d.Triage != nil {
+			triage.Routes(mux, d.Triage, auth.Middleware(d.Tokens))
+		}
 	}
 	return CORS(d.CORSOrigins)(mux)
 }

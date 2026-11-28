@@ -5,9 +5,13 @@ import type {
   AuthResponse,
   CreateIntakeResponse,
   Intake,
+  IntakeDetail,
   IntakeStatus,
   NewPatient,
+  PublicIntake,
+  SendMessageResponse,
   Staff,
+  Triage,
 } from "./types";
 
 export const API_URL = (
@@ -120,4 +124,43 @@ export const api = {
     const qs = query.size > 0 ? `?${query}` : "";
     return request<{ intakes: Intake[] }>(`/intakes${qs}`, { token, signal: opts.signal });
   },
+
+  getIntake: (token: string, id: string, signal?: AbortSignal) =>
+    request<IntakeDetail>(`/intakes/${encodeURIComponent(id)}`, { token, signal }),
+
+  /** The saved triage result, or null when triage has not run yet. */
+  getTriage: async (token: string, id: string, signal?: AbortSignal): Promise<Triage | null> => {
+    try {
+      const res = await request<{ triage: Triage }>(`/intakes/${encodeURIComponent(id)}/triage`, {
+        token,
+        signal,
+      });
+      return res.triage;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
+  },
+
+  runTriage: (token: string, id: string) =>
+    request<{ triage: Triage }>(`/intakes/${encodeURIComponent(id)}/triage/run`, {
+      method: "POST",
+      token,
+    }).then((r) => r.triage),
+
+  // ---- patient chat (no login. The link token is the key) ----
+
+  getPublicIntake: (linkToken: string, signal?: AbortSignal) =>
+    request<PublicIntake>(`/public/intakes/${encodeURIComponent(linkToken)}`, { signal }),
+
+  sendMessage: (linkToken: string, content: string) =>
+    request<SendMessageResponse>(`/public/intakes/${encodeURIComponent(linkToken)}/messages`, {
+      method: "POST",
+      body: { content },
+    }),
+
+  completeIntake: (linkToken: string) =>
+    request<{ status: IntakeStatus }>(`/public/intakes/${encodeURIComponent(linkToken)}/complete`, {
+      method: "POST",
+    }),
 };

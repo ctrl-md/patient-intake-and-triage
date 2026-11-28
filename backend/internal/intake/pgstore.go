@@ -20,9 +20,11 @@ func NewPGStore(pool *pgxpool.Pool) *PGStore {
 const intakeSelect = `
 	SELECT i.id::text, i.patient_id::text, p.full_name, i.status,
 	       i.expires_at, i.started_at, i.completed_at, i.created_at,
-	       (SELECT count(*) FROM messages m WHERE m.intake_id = i.id)
+	       (SELECT count(*) FROM messages m WHERE m.intake_id = i.id),
+	       COALESCE(t.staff_urgency, t.final_urgency)
 	FROM intakes i
-	LEFT JOIN patients p ON p.id = i.patient_id`
+	LEFT JOIN patients p ON p.id = i.patient_id
+	LEFT JOIN triage_results t ON t.intake_id = i.id`
 
 // CreateIntake saves the intake and, when given, the patient, in one statement.
 func (s *PGStore) CreateIntake(ctx context.Context, in NewIntake) (Intake, error) {
@@ -131,7 +133,7 @@ func (s *PGStore) Complete(ctx context.Context, intakeID string) error {
 func scanIntake(scan func(dest ...any) error) (Intake, error) {
 	var it Intake
 	err := scan(&it.ID, &it.PatientID, &it.PatientName, &it.Status,
-		&it.ExpiresAt, &it.StartedAt, &it.CompletedAt, &it.CreatedAt, &it.MessageCount)
+		&it.ExpiresAt, &it.StartedAt, &it.CompletedAt, &it.CreatedAt, &it.MessageCount, &it.Urgency)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Intake{}, ErrNotFound
 	}

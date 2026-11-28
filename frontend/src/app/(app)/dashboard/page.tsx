@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useAuthed } from "@/components/auth-provider";
+import { UrgencyBadge } from "@/components/urgency-badge";
 import { Alert, Button, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import { messageOf } from "@/lib/errors";
@@ -131,6 +133,7 @@ export default function DashboardPage() {
             <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-2 font-medium">Patient</th>
+                <th className="px-4 py-2 font-medium">Urgency</th>
                 <th className="px-4 py-2 font-medium">Status</th>
                 <th className="px-4 py-2 font-medium">Messages</th>
                 <th className="px-4 py-2 font-medium">Created</th>
@@ -140,7 +143,12 @@ export default function DashboardPage() {
               {intakes.map((i) => (
                 <tr key={i.id}>
                   <td className="px-4 py-3 text-slate-900">
-                    {i.patient_name ?? <span className="text-slate-400">Not named yet</span>}
+                    <Link href={`/intakes/${i.id}`} className="hover:text-teal-700 hover:underline">
+                      {i.patient_name ?? <span className="text-slate-400">Not named yet</span>}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3">
+                    <UrgencyBadge urgency={i.urgency} />
                   </td>
                   <td className="px-4 py-3">
                     <span

@@ -137,6 +137,41 @@ describe("api client", () => {
     assert.deepEqual(JSON.parse(seen.body), { patient: { full_name: "Emeka Eze" } });
   });
 
+  it("patient chat calls use no login and the link token", async () => {
+    reply = { status: 201, body: JSON.stringify({ message: { role: "patient", content: "hi" }, emergency: false }) };
+    const res = await apiModule.api.sendMessage("abc", "hi");
+    assert.equal(seen.url, "/public/intakes/abc/messages");
+    assert.equal(seen.auth, undefined);
+    assert.deepEqual(JSON.parse(seen.body), { content: "hi" });
+    assert.equal(res.emergency, false);
+
+    reply = { status: 200, body: JSON.stringify({ status: "completed" }) };
+    await apiModule.api.completeIntake("abc");
+    assert.equal(seen.url, "/public/intakes/abc/complete");
+    assert.equal(seen.method, "POST");
+  });
+
+  it("getTriage returns null on 404 but throws on other errors", async () => {
+    reply = { status: 404, body: JSON.stringify({ error: "triage result not found" }) };
+    assert.equal(await apiModule.api.getTriage("t", "id1"), null);
+    assert.equal(seen.url, "/intakes/id1/triage");
+
+    reply = { status: 500, body: JSON.stringify({ error: "something went wrong" }) };
+    await assert.rejects(apiModule.api.getTriage("t", "id1"));
+
+    reply = { status: 200, body: JSON.stringify({ triage: { final_urgency: "urgent" } }) };
+    const t = await apiModule.api.getTriage("t", "id1");
+    assert.equal(t?.final_urgency, "urgent");
+  });
+
+  it("runTriage posts and unwraps the result", async () => {
+    reply = { status: 200, body: JSON.stringify({ triage: { final_urgency: "emergency" } }) };
+    const t = await apiModule.api.runTriage("t", "id1");
+    assert.equal(seen.method, "POST");
+    assert.equal(seen.url, "/intakes/id1/triage/run");
+    assert.equal(t.final_urgency, "emergency");
+  });
+
   // Keep this one last: it shuts the fake server down.
   it("reports an unreachable server as status 0", async () => {
     server.closeAllConnections();

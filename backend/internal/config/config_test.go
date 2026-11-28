@@ -130,3 +130,40 @@ func TestLoadDotEnvMissingFileIsFine(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestLLMSettings(t *testing.T) {
+	t.Setenv("JWT_SECRET", goodSecret)
+	t.Setenv("LLM_PROVIDER", "")
+	t.Setenv("LLM_API_KEY", "")
+	t.Setenv("LLM_MODEL", "")
+	t.Setenv("LLM_TIMEOUT", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.LLMProvider != "gemini" || cfg.LLMAPIKey != "" || cfg.LLMTimeout != 20*time.Second {
+		t.Fatalf("bad LLM defaults: %+v", cfg)
+	}
+
+	t.Setenv("LLM_PROVIDER", "Groq")
+	t.Setenv("LLM_API_KEY", " abc ")
+	t.Setenv("LLM_TIMEOUT", "5s")
+	cfg, err = Load()
+	if err != nil || cfg.LLMProvider != "groq" || cfg.LLMAPIKey != "abc" || cfg.LLMTimeout != 5*time.Second {
+		t.Fatalf("cfg=%+v err=%v", cfg, err)
+	}
+}
+
+func TestLLMBadValues(t *testing.T) {
+	t.Setenv("JWT_SECRET", goodSecret)
+	t.Setenv("LLM_API_KEY", "abc")
+	t.Setenv("LLM_PROVIDER", "openai")
+	if _, err := Load(); err == nil {
+		t.Fatal("unknown provider with a key should fail")
+	}
+	t.Setenv("LLM_PROVIDER", "gemini")
+	t.Setenv("LLM_TIMEOUT", "fast")
+	if _, err := Load(); err == nil {
+		t.Fatal("bad timeout should fail")
+	}
+}
